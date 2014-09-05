@@ -22,19 +22,19 @@ class CrawlTwitPic
     {
         while ($url) {
             echo "\n{$url}\n";
-            $full_img_page_url_list = static::retry("getFullImagePageList", $url);
+            $full_img_page_url_list = $this->retry("getFullImagePageList", $url);
 
             foreach ($full_img_page_url_list as $full_img_page_url) {
-                $image_file_url = static::retry("getImageUrl", $full_img_page_url);
-                static::retry("downloadImage", $image_file_url);
+                $image_file_url = $this->retry("getImageUrl", $full_img_page_url);
+                $this->retry("downloadImage", $image_file_url);
                 echo ".";
             }
 
-            $url = static::retry('getNextUrl', $url);
+            $url = $this->retry('getNextUrl', $url);
         }
     }
 
-    public function getFullImagePageList($url)
+    private function getFullImagePageList($url)
     {
         $g = new Client;
         $c = $g->request("GET", $url);
@@ -46,7 +46,7 @@ class CrawlTwitPic
         return $img_url;
     }
 
-    public function getNextUrl($url)
+    private function getNextUrl($url)
     {
         $g = new Client;
         $c = $g->request("GET", $url);
@@ -62,7 +62,7 @@ class CrawlTwitPic
         return $next_url;
     }
 
-    public function getImageUrl($url)
+    private function getImageUrl($url)
     {
         $g = new Client;
         $c = $g->request("GET", $url);
@@ -70,7 +70,7 @@ class CrawlTwitPic
         return $img_url;
     }
 
-    public function downloadImage($image_url)
+    private function downloadImage($image_url)
     {
         if (!preg_match('/\/(?<filename>[0-9]+\.[a-zA-Z]{3,4})\?/u', $image_url, $_)) {
             throw new \Exception('file_name get fail. from, ' . $image_url);
@@ -80,7 +80,7 @@ class CrawlTwitPic
         file_put_contents(static::OUTPUT_DIR . $filename, $raw);
     }
 
-    function retry($methodName, $params)
+    private function retry($methodName, $params)
     {
         $retry = static::RETRY;
         while ($retry--) {
@@ -89,6 +89,7 @@ class CrawlTwitPic
             } catch (\Exception $e) {
                 echo "retry! {$methodName}\n";
             }
+            sleep(2);
         }
         echo "give up."; // リトライ成功しなかったので死
         exit;
