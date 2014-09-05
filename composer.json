@@ -1,0 +1,6 @@
+{
+    "require": {
+        "fabpot/goutte": "dev-master",
+        "jbroadway/urlify": "dev-master"
+    }
+}
