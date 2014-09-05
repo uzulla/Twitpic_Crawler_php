@@ -20,25 +20,17 @@ class CrawlTwitPic
 
     public function run($url)
     {
-
         while ($url) {
             echo "\n{$url}\n";
-            $full_img_page_url_list = static::retry(['\CrawlTwitPic', "getFullImagePageList"], $url);
+            $full_img_page_url_list = static::retry("getFullImagePageList", $url);
 
             foreach ($full_img_page_url_list as $full_img_page_url) {
-                list($image_file_url, $filename) =
-                    static::retry(['\CrawlTwitPic', "getImageUrlAndFileName"], $full_img_page_url);
-
-                $raw = file_get_contents($image_file_url);
-                if ($raw === false) {
-                    throw new \Exception('download fail:' . $image_file_url);
-                }
-                file_put_contents(static::OUTPUT_DIR . $filename, $raw);
-
+                $image_file_url = static::retry("getImageUrl", $full_img_page_url);
+                static::retry("downloadImage", $image_file_url);
                 echo ".";
             }
 
-            $url = static::retry(['\CrawlTwitPic', 'getNextUrl'], $url);
+            $url = static::retry('getNextUrl', $url);
         }
     }
 
@@ -60,36 +52,42 @@ class CrawlTwitPic
         $c = $g->request("GET", $url);
         $base_url = preg_replace('/\?.*\z/u', '', $url);
         $next_url = false;
-        $c->filter('.pagination a')->each(function (Crawler $node) use (&$next_url, $base_url) {
-            if ($node->text() === 'Next') {
-                $next_url = $base_url . $node->attr('href');
+        $c->filter('.pagination a')->each(
+            function (Crawler $node) use (&$next_url, $base_url) {
+                if ($node->text() === 'Next') {
+                    $next_url = $base_url . $node->attr('href');
+                }
             }
-        });
+        );
         return $next_url;
     }
 
-    public function getImageUrlAndFileName($url)
+    public function getImageUrl($url)
     {
         $g = new Client;
         $c = $g->request("GET", $url);
         $img_url = $c->filter('#content img')->attr('src');
-
-        if (!preg_match('/\/(?<filename>[0-9]+\.[a-zA-Z]{3,4})\?/u', $img_url, $_)) {
-            throw new \Exception('file_name get fail. from, ' . $url);
-        }
-        $filename = $_['filename'];
-
-        return [$img_url, $filename];
+        return $img_url;
     }
 
-    function retry(callable $callable, $params)
+    public function downloadImage($image_url)
+    {
+        if (!preg_match('/\/(?<filename>[0-9]+\.[a-zA-Z]{3,4})\?/u', $image_url, $_)) {
+            throw new \Exception('file_name get fail. from, ' . $image_url);
+        }
+        $filename = $_['filename'];
+        $raw = file_get_contents($image_url);
+        file_put_contents(static::OUTPUT_DIR . $filename, $raw);
+    }
+
+    function retry($methodName, $params)
     {
         $retry = static::RETRY;
         while ($retry--) {
             try {
-                return call_user_func($callable, $params);
+                return call_user_func(['\CrawlTwitPic', $methodName], $params);
             } catch (\Exception $e) {
-                echo "retry! {$callable[1]}\n";
+                echo "retry! {$methodName}\n";
             }
         }
         echo "give up."; // リトライ成功しなかったので死
